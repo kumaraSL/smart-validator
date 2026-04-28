@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, ReactElement } from 'react';
 import { Dropzone } from './components/Dropzone';
 import { ApplicantList } from './components/ApplicantList';
 import { ApplicantDetail, Applicant, Submission } from './components/ApplicantDetail';
@@ -7,7 +7,7 @@ import './index.css';
 
 type NavView = 'upload' | 'users';
 
-const NAV: { id: NavView; label: string; icon: JSX.Element }[] = [
+const NAV: { id: NavView; label: string; icon: ReactElement }[] = [
   {
     id: 'upload',
     label: 'Upload Documents',
