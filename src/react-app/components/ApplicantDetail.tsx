@@ -1,7 +1,7 @@
 import React from 'react';
 import { StatusChip } from './StatusChip';
 import { DocumentList, DocumentData } from './DocumentList';
-import { VerificationConsole } from './VerificationConsole';
+import { DocumentReviewModal } from './DocumentReviewModal';
 
 export interface Submission {
   id: string;
@@ -178,35 +178,36 @@ export const ApplicantDetail: React.FC<ApplicantDetailProps> = ({ applicant, onU
 
       {/* Tab: Individual Check */}
       {activeTab === 'individual' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-5)', minHeight: '400px' }}>
-          <div className="card" style={{ overflow: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-4)' }}>
-              <h3>Documents (v{currentSubmission.version})</h3>
-              <select
-                className="search-input"
-                value={selectedVersion}
-                onChange={e => { setSelectedVersion(Number(e.target.value)); setSelectedDocId(undefined); }}
-                style={{ width: 'auto', paddingLeft: '12px' }}
-              >
-                {applicant.submissions.map(s => (
-                  <option key={s.version} value={s.version}>v{s.version} — {s.submittedAt}</option>
-                ))}
-              </select>
-            </div>
-            <DocumentList
-              documents={currentSubmission.documents}
-              onSelectDocument={doc => setSelectedDocId(doc.id)}
-              selectedDocId={selectedDocId}
-            />
+        <div className="card" style={{ overflow: 'auto', minHeight: '400px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-4)' }}>
+            <h3>Documents (v{currentSubmission.version})</h3>
+            <select
+              className="search-input"
+              value={selectedVersion}
+              onChange={e => { setSelectedVersion(Number(e.target.value)); setSelectedDocId(undefined); }}
+              style={{ width: 'auto', paddingLeft: '12px' }}
+            >
+              {applicant.submissions.map(s => (
+                <option key={s.version} value={s.version}>v{s.version} — {s.submittedAt}</option>
+              ))}
+            </select>
           </div>
-          <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <VerificationConsole
-              logs={selectedDoc?.logs ?? []}
-              documentName={selectedDoc?.name}
-              status={selectedDoc?.status}
-            />
-          </div>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--sp-4)', fontSize: '14px' }}>
+            Click on a document to open the review mode and complete the verification checklist.
+          </p>
+          <DocumentList
+            documents={currentSubmission.documents}
+            onSelectDocument={doc => setSelectedDocId(doc.id)}
+          />
         </div>
+      )}
+
+      {/* Document Review Modal */}
+      {selectedDoc && (
+        <DocumentReviewModal 
+          document={selectedDoc} 
+          onClose={() => setSelectedDocId(undefined)} 
+        />
       )}
 
       {/* Tab: Version History */}
