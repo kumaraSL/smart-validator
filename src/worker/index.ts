@@ -10,6 +10,62 @@ app.use("/api/*", cors());
 
 const uid = () => crypto.randomUUID();
 
+// ── Auto-migration: create tables if missing ──────────────────
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS applicants (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  passport_no TEXT NOT NULL UNIQUE,
+  nationality TEXT NOT NULL,
+  dob TEXT NOT NULL,
+  sponsor_name TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS submissions (
+  id TEXT PRIMARY KEY,
+  applicant_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  completion_percentage INTEGER NOT NULL DEFAULT 0,
+  prev_completion_percentage INTEGER NOT NULL DEFAULT 0,
+  submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(applicant_id, version)
+);
+CREATE TABLE IF NOT EXISTS documents (
+  id TEXT PRIMARY KEY,
+  submission_id TEXT NOT NULL,
+  applicant_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  status TEXT NOT NULL,
+  version INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS document_logs (
+  id TEXT PRIMARY KEY,
+  document_id TEXT NOT NULL,
+  timestamp TEXT NOT NULL,
+  type TEXT NOT NULL,
+  message TEXT NOT NULL,
+  details TEXT
+);
+`;
+
+app.use("/api/*", async (c, next) => {
+  const db = c.env.DB;
+  if (db) {
+    try {
+      const check = await db.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='applicants'"
+      ).first();
+      if (!check) {
+        for (const stmt of SCHEMA.split(";").filter(s => s.trim())) {
+          await db.prepare(stmt + ";").run();
+        }
+      }
+    } catch { /* ignore migration errors */ }
+  }
+  await next();
+});
+
 // ── Diagnostic ────────────────────────────────────────────────
 app.get("/api/health", async (c) => {
   const db = c.env.DB;
