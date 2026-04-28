@@ -29,9 +29,10 @@ interface ApplicantDetailProps {
   applicant: Applicant;
   onUploadRevision: (applicantId: string) => void;
   onBack: () => void;
+  onDelete?: (applicantId: string) => void;
 }
 
-export const ApplicantDetail: React.FC<ApplicantDetailProps> = ({ applicant, onUploadRevision, onBack }) => {
+export const ApplicantDetail: React.FC<ApplicantDetailProps> = ({ applicant, onUploadRevision, onBack, onDelete }) => {
   const [activeTab, setActiveTab] = React.useState<DetailTab>('all');
   const [selectedVersion, setSelectedVersion] = React.useState<number>(applicant.submissions.length);
   const [selectedDocId, setSelectedDocId] = React.useState<string | undefined>();
@@ -83,6 +84,12 @@ export const ApplicantDetail: React.FC<ApplicantDetailProps> = ({ applicant, onU
               </svg>
               Upload Revision
             </button>
+            {onDelete && (
+              <button className="btn-ghost" style={{ color: 'var(--error)', border: '1px solid var(--error)', borderRadius: 'var(--radius-md)', padding: '6px 12px' }} onClick={() => onDelete(applicant.id)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                Delete
+              </button>
+            )}
           </div>
         </div>
       </div>

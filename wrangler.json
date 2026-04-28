@@ -3,7 +3,9 @@
 	"name": "smart-validator",
 	"main": "./src/worker/index.ts",
 	"compatibility_date": "2025-10-08",
-	"compatibility_flags": ["nodejs_compat"],
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
 	"observability": {
 		"enabled": true
 	},
@@ -11,5 +13,12 @@
 	"assets": {
 		"directory": "./dist/client",
 		"not_found_handling": "single-page-application"
-	}
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "smart-validator-db",
+			"database_id": "f99481eb-9485-4724-8eed-0d086eab1a2a"
+		}
+	]
 }
