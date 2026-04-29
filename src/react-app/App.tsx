@@ -2,11 +2,24 @@ import { useState, useEffect, useCallback, ReactElement } from 'react';
 import { Dropzone } from './components/Dropzone';
 import { ApplicantList } from './components/ApplicantList';
 import { ApplicantDetail, Applicant } from './components/ApplicantDetail';
+import { Dashboard } from './components/Dashboard';
 import './index.css';
 
-type NavView = 'upload' | 'users';
+type NavView = 'dashboard' | 'upload' | 'users';
 
 const NAV: { id: NavView; label: string; icon: ReactElement }[] = [
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="7" height="9"/>
+        <rect x="14" y="3" width="7" height="5"/>
+        <rect x="14" y="12" width="7" height="9"/>
+        <rect x="3" y="16" width="7" height="5"/>
+      </svg>
+    ),
+  },
   {
     id: 'upload',
     label: 'Upload Documents',
@@ -39,7 +52,7 @@ const Spinner = ({ size = 20 }: { size?: number }) => (
 );
 
 function App() {
-  const [activeView, setActiveView] = useState<NavView>('upload');
+  const [activeView, setActiveView] = useState<NavView>('dashboard');
   const [files, setFiles] = useState<File[]>([]);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -222,6 +235,9 @@ function App() {
               <button onClick={() => setError(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}>×</button>
             </div>
           )}
+
+          {/* ── VIEW: Dashboard ── */}
+          {activeView === 'dashboard' && <Dashboard />}
 
           {/* ── VIEW: Upload ── */}
           {activeView === 'upload' && (

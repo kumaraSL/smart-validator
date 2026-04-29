@@ -295,4 +295,71 @@ app.delete("/api/applicants/:id", async (c) => {
 
 app.get("/api/", (c) => c.json({ name: "Smart Validator", version: "2.0" }));
 
+// ── GET /api/dashboard/stats ──────────────────────────────────
+app.get("/api/dashboard/stats", async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json({ error: "DB binding not found" }, 500);
+
+  try {
+    // Total Applicants
+    const applicantsRes = await db.prepare("SELECT COUNT(*) as count FROM applicants").first();
+    const totalApplicants = applicantsRes?.count || 0;
+
+    // Total Documents
+    const docsRes = await db.prepare("SELECT COUNT(*) as count FROM documents").first();
+    const totalDocuments = docsRes?.count || 0;
+
+    // Passed Documents (Status = VERIFIED)
+    const passedRes = await db.prepare("SELECT COUNT(*) as count FROM documents WHERE status = 'VERIFIED'").first();
+    const passedDocuments = passedRes?.count || 0;
+
+    const passRate = Number(totalDocuments) > 0 ? Math.round((Number(passedDocuments) / Number(totalDocuments)) * 100) : 0;
+
+    // Recent Activity (Last 5 processed documents joined with applicant info)
+    const { results: recentActivity } = await db.prepare(`
+      SELECT 
+        d.id as documentId,
+        d.name as documentName,
+        d.status,
+        s.submitted_at as date,
+        a.name as applicantName
+      FROM documents d
+      JOIN submissions s ON d.submission_id = s.id
+      JOIN applicants a ON s.applicant_id = a.id
+      ORDER BY s.submitted_at DESC
+      LIMIT 5
+    `).all();
+
+    // Mock Trends for Line Chart
+    const trends = [
+      { name: "Jan-24", value: 120 },
+      { name: "Feb-24", value: 150 },
+      { name: "Mar-24", value: 180 },
+      { name: "Apr-24", value: 220 },
+      { name: "May-24", value: 270 },
+      { name: "Jun-24", value: 310 }
+    ];
+
+    // Mock Issue Breakdown for Bar Chart
+    const issueBreakdown = [
+      { name: "Missing Signature", value: 45 },
+      { name: "Low Resolution", value: 30 },
+      { name: "Expired ID", value: 20 },
+      { name: "Name Mismatch", value: 15 }
+    ];
+
+    return c.json({
+      totalApplicants,
+      totalDocuments,
+      passRate,
+      recentActivity,
+      trends,
+      issueBreakdown
+    });
+  } catch (e: any) {
+    console.error("Failed to load dashboard stats", e);
+    return c.json({ error: String(e) }, 500);
+  }
+});
+
 export default app;
