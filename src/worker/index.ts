@@ -1,8 +1,11 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { DocumentSchemas, DocumentType, getJsonSchemaForDocument } from "../shared/document-schemas";
 
 type Env = {
   DB: D1Database;
+  AI: any;
+  BUCKET: R2Bucket;
 };
 
 const app = new Hono<{ Bindings: Env }>();
@@ -36,6 +39,9 @@ CREATE TABLE IF NOT EXISTS documents (
   applicant_id TEXT NOT NULL,
   name TEXT NOT NULL,
   category TEXT NOT NULL,
+  document_type TEXT,
+  extracted_data TEXT,
+  storage_path TEXT,
   status TEXT NOT NULL,
   version INTEGER NOT NULL
 );
@@ -163,9 +169,18 @@ app.post("/api/verify", async (c) => {
   if (!db) return c.json({ error: "DB binding not found" }, 500);
 
   try {
-    const body = await c.req.json().catch(() => ({}));
-    const files: string[] = body.files || [];
-    const existingApplicantId: string | null = body.applicantId || null;
+    const body = await c.req.parseBody();
+    const existingApplicantId = (body.applicantId as string) || null;
+    
+    const uploadedFiles: File[] = [];
+    if (body.files) {
+      if (Array.isArray(body.files)) {
+        uploadedFiles.push(...(body.files as unknown as File[]));
+      } else {
+        uploadedFiles.push(body.files as unknown as File);
+      }
+    }
+
     const now = new Date().toLocaleTimeString("en-US", { hour12: false });
     const submittedAt = new Date().toLocaleString("en-US");
 
@@ -214,10 +229,33 @@ app.post("/api/verify", async (c) => {
       .bind(submissionId, applicantId, actualVersion, mockCompletion.percentage, mockCompletion.previousPercentage, submittedAt)
       .run();
 
-    const mockDocuments: { name: string; category: string; status: string; logs: { type: string; message: string; details?: string }[] }[] = [
+    // Prepare processing details for real uploaded files
+    const fileProcessingDetails = [];
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const file = uploadedFiles[i];
+      const storagePath = `uploads/${applicantId}/${submissionId}/${file.name}`;
+      
+      if (c.env.BUCKET) {
+        await c.env.BUCKET.put(storagePath, await file.arrayBuffer(), {
+          httpMetadata: { contentType: file.type }
+        });
+      }
+
+      fileProcessingDetails.push({
+        name: file.name,
+        category: "Uploaded",
+        storagePath: storagePath,
+        status: "neutral" as const,
+        logs: [{ type: "info", message: `File "${file.name}" received and stored in R2.`, details: `File ${i + 1} of ${uploadedFiles.length} queued.` }],
+      });
+    }
+
+    // Keep the mock documents as well for the demo experience
+    const mockDocuments: any[] = [
       {
         name: "Commercial_Bank_Statement.pdf",
         category: "Financial",
+        storagePath: null,
         status: "success",
         logs: [
           { type: "success", message: "Bank Statement verification passed.", details: "3-year history analyzed. Closing balance: 9.2M LKR." },
@@ -226,6 +264,7 @@ app.post("/api/verify", async (c) => {
       {
         name: isV2 ? "Birth_Certificate_V2.pdf" : "Birth_Certificate.pdf",
         category: "Identity",
+        storagePath: null,
         status: isV2 ? "success" : "error",
         logs: isV2
           ? [{ type: "success", message: "Name cross-check passed.", details: "Affidavit accepted." }]
@@ -234,25 +273,21 @@ app.post("/api/verify", async (c) => {
       {
         name: isV2 ? "AL_Certificate_Stamped.pdf" : "AL_Certificate.pdf",
         category: "Educational",
+        storagePath: null,
         status: isV2 ? "success" : "error",
         logs: isV2
           ? [{ type: "success", message: "Foreign Ministry stamp detected." }]
           : [{ type: "error", message: "Missing: Foreign Ministry stamp not found.", details: "Resubmit with stamp." }],
       },
-      ...files.map((fname, i) => ({
-        name: fname,
-        category: "Uploaded",
-        status: "neutral" as const,
-        logs: [{ type: "info", message: `File "${fname}" received.`, details: `File ${i + 1} of ${files.length} queued.` }],
-      })),
+      ...fileProcessingDetails
     ];
 
     const savedDocs = [];
     for (const doc of mockDocuments) {
       const docId = uid();
       await db
-        .prepare("INSERT INTO documents (id, submission_id, applicant_id, name, category, status, version) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .bind(docId, submissionId, applicantId, doc.name, doc.category, doc.status, actualVersion)
+        .prepare("INSERT INTO documents (id, submission_id, applicant_id, name, category, document_type, extracted_data, storage_path, status, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(docId, submissionId, applicantId, doc.name, doc.category, null, null, doc.storagePath, doc.status, actualVersion)
         .run();
 
       const savedLogs = [];
@@ -275,6 +310,7 @@ app.post("/api/verify", async (c) => {
       submission: { id: submissionId, version: actualVersion, submittedAt },
     });
   } catch (e: any) {
+    console.error(e);
     return c.json({ error: String(e), stack: e?.stack }, 500);
   }
 });
@@ -290,6 +326,65 @@ app.delete("/api/applicants/:id", async (c) => {
     return c.json({ success: true });
   } catch (e: any) {
     return c.json({ error: String(e) }, 500);
+  }
+});
+
+// ── POST /api/extract ─────────────────────────────────────────
+app.post("/api/extract", async (c) => {
+  const env = c.env;
+  if (!env.AI) return c.json({ error: "AI binding not found" }, 500);
+
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { documentType, text } = body as { documentType?: DocumentType; text?: string };
+
+    if (!documentType || !DocumentSchemas[documentType]) {
+      return c.json({ error: "Invalid or missing documentType" }, 400);
+    }
+    if (!text) {
+      return c.json({ error: "Missing text for extraction" }, 400);
+    }
+
+    const jsonSchema = getJsonSchemaForDocument(documentType);
+    
+    const prompt = `You are an expert data extraction assistant. 
+Extract the requested information from the OCR text below.
+You MUST output ONLY valid JSON matching the following JSON Schema. Do not include markdown formatting or any other text.
+JSON Schema:
+${JSON.stringify(jsonSchema, null, 2)}
+
+OCR Text:
+${text}`;
+
+    const aiResponse = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
+      messages: [
+        { role: "system", content: prompt }
+      ]
+    });
+
+    let rawJson = "";
+    if (typeof aiResponse === "object" && aiResponse.response) {
+      rawJson = aiResponse.response;
+    } else if (typeof aiResponse === "string") {
+      rawJson = aiResponse;
+    }
+
+    // Clean markdown blocks if the model wrapped it in ```json
+    rawJson = rawJson.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
+
+    const parsed = JSON.parse(rawJson);
+    
+    // Validate with Zod
+    const validatedData = DocumentSchemas[documentType].parse(parsed);
+
+    return c.json({
+      success: true,
+      documentType,
+      data: validatedData
+    });
+  } catch (e: any) {
+    console.error("Extraction error:", e);
+    return c.json({ error: String(e), stack: e?.stack }, 500);
   }
 });
 

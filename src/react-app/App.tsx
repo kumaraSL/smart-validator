@@ -95,13 +95,13 @@ function App() {
     setIsVerifying(true);
     setError(null);
     try {
+      const formData = new FormData();
+      if (revisingApplicantId) formData.append('applicantId', revisingApplicantId);
+      files.forEach(f => formData.append('files', f));
+
       const res = await fetch('/api/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          files: files.map(f => f.name),
-          applicantId: revisingApplicantId,
-        }),
+        body: formData,
       });
       if (!res.ok) throw new Error(`Verification failed: ${res.status}`);
       const data = await res.json();

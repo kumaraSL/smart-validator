@@ -134,9 +134,9 @@ export const Dashboard = () => {
 
       {/* --- Recent Activity Table --- */}
       <div className="dashboard-card table-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-4)' }}>
+        <div className="table-header">
           <h3 className="kpi-title" style={{ margin: 0, color: 'var(--text-primary)', fontSize: '18px' }}>Recent Activity</h3>
-          <button className="btn-primary" style={{ background: '#4ade80', color: '#fff', padding: '6px 16px', borderRadius: '4px', fontSize: '14px', border: 'none' }}>View All</button>
+          <button className="btn-primary" style={{ background: 'var(--color-green)', color: '#fff', padding: '6px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, border: 'none', transition: 'background 0.2s' }}>View All</button>
         </div>
         
         <table className="dashboard-table">
@@ -153,13 +153,20 @@ export const Dashboard = () => {
             {stats.recentActivity && stats.recentActivity.length > 0 ? (
               stats.recentActivity.map((activity: any, idx: number) => (
                 <tr key={idx}>
-                  <td style={{ fontWeight: 600 }}>{activity.applicantName}</td>
-                  <td>{activity.documentName}</td>
-                  <td>{new Date(activity.date).toISOString().split('T')[0]}</td>
-                  <td>Completed</td>
+                  <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{activity.applicantName}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{activity.documentName}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{new Date(activity.date).toISOString().split('T')[0]}</td>
+                  <td style={{ fontWeight: 500 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '80px', height: '6px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', background: 'var(--color-green)', width: activity.status === 'VERIFIED' ? '100%' : '50%' }}></div>
+                      </div>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{activity.status === 'VERIFIED' ? '100%' : '50%'}</span>
+                    </div>
+                  </td>
                   <td>
                     <span className={`status-pill ${activity.status.toLowerCase()}`}>
-                      {activity.status === 'VERIFIED' ? 'In Progress' : 'Locked'}
+                      {activity.status === 'VERIFIED' ? 'Completed' : 'Pending'}
                     </span>
                   </td>
                 </tr>
@@ -168,32 +175,60 @@ export const Dashboard = () => {
               // Mock rows if db is empty
               <>
                 <tr>
-                  <td style={{ fontWeight: 600 }}>Jane Doe</td>
-                  <td>Python Basics</td>
-                  <td>2024-07-20</td>
-                  <td>-</td>
-                  <td><span className="status-pill in-progress">In Progress</span></td>
-                </tr>
-                <tr className="striped">
-                  <td style={{ fontWeight: 600 }}>John Smith</td>
-                  <td>Web Dev 101</td>
-                  <td>2024-19</td>
-                  <td>Completed</td>
+                  <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Jane Doe</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>Python Basics</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>2024-07-20</td>
+                  <td style={{ fontWeight: 500 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '80px', height: '6px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', background: 'var(--color-blue)', width: '60%' }}></div>
+                      </div>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>60%</span>
+                    </div>
+                  </td>
                   <td><span className="status-pill in-progress">In Progress</span></td>
                 </tr>
                 <tr>
-                  <td style={{ fontWeight: 600 }}>Alice Chen</td>
-                  <td>Data Science</td>
-                  <td>45%-18</td>
-                  <td>lonpleted</td>
-                  <td><span className="status-pill locked">Locked</span></td>
+                  <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>John Smith</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>Web Dev 101</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>2024-07-19</td>
+                  <td style={{ fontWeight: 500 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '80px', height: '6px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', background: 'var(--color-green)', width: '100%' }}></div>
+                      </div>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>100%</span>
+                    </div>
+                  </td>
+                  <td><span className="status-pill completed">Completed</span></td>
                 </tr>
-                <tr className="striped">
-                  <td style={{ fontWeight: 600 }}>Omar Hassan</td>
-                  <td>JavaSPrift</td>
-                  <td>0107-17</td>
-                  <td>-</td>
-                  <td><span className="status-pill locked-gray">Locked</span></td>
+                <tr>
+                  <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Alice Chen</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>Data Science</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>2024-07-18</td>
+                  <td style={{ fontWeight: 500 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '80px', height: '6px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', background: 'var(--color-blue)', width: '45%' }}></div>
+                      </div>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>45%</span>
+                    </div>
+                  </td>
+                  <td><span className="status-pill pending">Pending</span></td>
+                </tr>
+                <tr>
+                  <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Omar Hassan</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>JavaScript Adv</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>2024-07-17</td>
+                  <td style={{ fontWeight: 500 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '80px', height: '6px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', background: 'var(--color-blue)', width: '10%' }}></div>
+                      </div>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>10%</span>
+                    </div>
+                  </td>
+                  <td><span className="status-pill locked">Locked</span></td>
                 </tr>
               </>
             )}

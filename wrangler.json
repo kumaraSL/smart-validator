@@ -20,5 +20,14 @@
 			"database_name": "smart-validator-db",
 			"database_id": "f99481eb-9485-4724-8eed-0d086eab1a2a"
 		}
+	],
+	"ai": {
+		"binding": "AI"
+	},
+	"r2_buckets": [
+		{
+			"binding": "BUCKET",
+			"bucket_name": "smart-validator"
+		}
 	]
 }

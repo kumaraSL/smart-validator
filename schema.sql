@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS documents (
   applicant_id TEXT NOT NULL,
   name TEXT NOT NULL,
   category TEXT NOT NULL,
+  document_type TEXT,
+  extracted_data TEXT,
+  storage_path TEXT,
   status TEXT NOT NULL CHECK(status IN ('success','error','in_progress','neutral')),
   version INTEGER NOT NULL
 );
