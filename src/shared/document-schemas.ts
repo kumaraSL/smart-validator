@@ -390,5 +390,5 @@ export type DocumentType = keyof typeof DocumentSchemas;
 
 // AIシステムプロンプト等へ渡すためのJSON Schema取得ヘルパー
 export function getJsonSchemaForDocument(type: DocumentType) {
-  return zodToJsonSchema(DocumentSchemas[type], type);
+  return zodToJsonSchema(DocumentSchemas[type] as any, type);
 }
