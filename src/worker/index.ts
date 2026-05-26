@@ -459,29 +459,34 @@ app.get("/api/dashboard/stats", async (c) => {
 
 // ── GET /api/files ────────────────────────────────────────────
 app.get("/api/files", async (c) => {
-  const db = c.env.DB;
-  if (!db) return c.json({ error: "DB binding not found" }, 500);
+  const env = c.env;
+  if (!env.BUCKET) return c.json({ error: "BUCKET binding not found" }, 500);
 
   try {
-    const { results } = await db.prepare(`
-      SELECT 
-        d.id as documentId,
-        d.name,
-        d.category,
-        d.storage_path,
-        d.status,
-        a.name as applicantName,
-        s.submitted_at as date
-      FROM documents d
-      JOIN submissions s ON d.submission_id = s.id
-      JOIN applicants a ON s.applicant_id = a.id
-      WHERE d.storage_path IS NOT NULL
-      ORDER BY s.submitted_at DESC
-    `).all();
+    const list = await env.BUCKET.list();
+    
+    // Map R2 objects to FileRecord format expected by frontend
+    const files = list.objects.map(obj => {
+      const parts = obj.key.split("/");
+      const name = parts[parts.length - 1];
+      
+      // format: uploads/[applicantId]/[submissionId]/[filename]
+      const applicantId = parts.length > 2 ? parts[1] : "Unknown";
+      
+      return {
+        documentId: obj.key,
+        name: name,
+        category: "Storage",
+        storage_path: obj.key,
+        status: "success", // In R2 means successfully uploaded
+        applicantName: `ID: ${applicantId.substring(0, 8)}...`, // We show ID since we don't join with DB
+        date: obj.uploaded
+      };
+    });
 
-    return c.json(results);
+    return c.json(files);
   } catch (e: unknown) {
-    console.error("Failed to fetch files:", e);
+    console.error("Failed to list files from R2:", e);
     return c.json({ error: String(e) }, 500);
   }
 });
