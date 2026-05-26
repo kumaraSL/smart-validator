@@ -4,7 +4,11 @@ import { ApplicantList } from './components/ApplicantList';
 import { ApplicantDetail, Applicant } from './components/ApplicantDetail';
 import { Dashboard } from './components/Dashboard';
 import { FileList } from './components/FileList';
+import * as pdfjsLib from 'pdfjs-dist';
 import './index.css';
+
+// Setup pdf.js worker using cdnjs
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 type NavView = 'dashboard' | 'upload' | 'users' | 'files';
 
@@ -65,6 +69,26 @@ const Spinner = ({ size = 20 }: { size?: number }) => (
   </svg>
 );
 
+// ── PDF Text Extractor ──────────────────────────────────────────
+async function extractTextFromPdf(file: File): Promise<string> {
+  if (file.type !== 'application/pdf') return '';
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let text = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const strings = content.items.map((item: any) => item.str);
+      text += strings.join(' ') + '\n';
+    }
+    return text;
+  } catch (e) {
+    console.error("PDF extraction error:", e);
+    return '';
+  }
+}
+
 function App() {
   const [activeView, setActiveView] = useState<NavView>('dashboard');
   const [files, setFiles] = useState<File[]>([]);
@@ -111,7 +135,13 @@ function App() {
     try {
       const formData = new FormData();
       if (revisingApplicantId) formData.append('applicantId', revisingApplicantId);
-      files.forEach(f => formData.append('files', f));
+      
+      // Extract text from PDFs
+      for (const f of files) {
+        formData.append('files', f);
+        const text = await extractTextFromPdf(f);
+        formData.append('rawTexts', text);
+      }
 
       const res = await fetch('/api/verify', {
         method: 'POST',

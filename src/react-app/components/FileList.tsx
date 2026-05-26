@@ -8,6 +8,7 @@ type FileRecord = {
   status: string;
   applicantName: string;
   date: string;
+  raw_text?: string;
 };
 
 // ── Spinner ─────────────────────────────────────────────────────
@@ -251,7 +252,7 @@ export function FileList() {
             background: 'var(--bg-card)',
             borderRadius: 'var(--radius-lg)',
             width: '100%',
-            maxWidth: '900px',
+            maxWidth: '1200px',
             height: '85vh',
             display: 'flex',
             flexDirection: 'column',
@@ -297,24 +298,40 @@ export function FileList() {
               </div>
             </div>
             
-            <div style={{ flex: 1, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {isLoadingFile ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', color: 'var(--text-secondary)' }}>
-                  <Spinner size={32} />
-                  <span>Loading file content...</span>
+            <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+              <div style={{ flex: 1, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid var(--border)' }}>
+                {isLoadingFile ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', color: 'var(--text-secondary)' }}>
+                    <Spinner size={32} />
+                    <span>Loading file content...</span>
+                  </div>
+                ) : fileError ? (
+                  <div style={{ color: 'var(--error)', padding: '24px', textAlign: 'center' }}>
+                    <h3>Failed to display file</h3>
+                    <p>{fileError}</p>
+                  </div>
+                ) : fileUrl ? (
+                  <iframe 
+                    src={fileUrl}
+                    style={{ width: '100%', height: '100%', border: 'none' }}
+                    title={selectedFile.name}
+                  />
+                ) : null}
+              </div>
+              <div style={{ width: '400px', background: '#fff', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ padding: 'var(--sp-3) var(--sp-4)', borderBottom: '1px solid var(--border)', background: 'var(--bg-body)', fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>
+                  抽出テキスト (Extracted Text)
                 </div>
-              ) : fileError ? (
-                <div style={{ color: 'var(--error)', padding: '24px', textAlign: 'center' }}>
-                  <h3>Failed to display file</h3>
-                  <p>{fileError}</p>
+                <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--sp-4)', fontSize: '13px', lineHeight: 1.6, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'monospace' }}>
+                  {selectedFile.raw_text ? (
+                    selectedFile.raw_text
+                  ) : (
+                    <div style={{ textAlign: 'center', marginTop: '40px', fontStyle: 'italic', opacity: 0.7 }}>
+                      テキスト情報がありません。<br/>(No text extracted for this file)
+                    </div>
+                  )}
                 </div>
-              ) : fileUrl ? (
-                <iframe 
-                  src={fileUrl}
-                  style={{ width: '100%', height: '100%', border: 'none' }}
-                  title={selectedFile.name}
-                />
-              ) : null}
+              </div>
             </div>
           </div>
         </div>

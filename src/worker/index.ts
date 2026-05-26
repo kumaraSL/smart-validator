@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS documents (
   document_type TEXT,
   extracted_data TEXT,
   storage_path TEXT,
+  raw_text TEXT,
   status TEXT NOT NULL,
   version INTEGER NOT NULL
 );
@@ -66,6 +67,10 @@ app.use("/api/*", async (c, next) => {
         for (const stmt of SCHEMA.split(";").filter(s => s.trim())) {
           await db.prepare(stmt + ";").run();
         }
+      } else {
+        // Safe auto-migration for existing development databases
+        await db.prepare("ALTER TABLE documents ADD COLUMN storage_path TEXT;").run().catch(() => {});
+        await db.prepare("ALTER TABLE documents ADD COLUMN raw_text TEXT;").run().catch(() => {});
       }
     } catch { /* ignore migration errors */ }
   }
@@ -181,6 +186,15 @@ app.post("/api/verify", async (c) => {
       }
     }
 
+    const extractedTexts: string[] = [];
+    if (body.rawTexts) {
+      if (Array.isArray(body.rawTexts)) {
+        extractedTexts.push(...(body.rawTexts as string[]));
+      } else {
+        extractedTexts.push(body.rawTexts as string);
+      }
+    }
+
     const now = new Date().toLocaleTimeString("en-US", { hour12: false });
     const submittedAt = new Date().toLocaleString("en-US");
 
@@ -234,6 +248,7 @@ app.post("/api/verify", async (c) => {
     for (let i = 0; i < uploadedFiles.length; i++) {
       const file = uploadedFiles[i];
       const storagePath = `uploads/${applicantId}/${submissionId}/${file.name}`;
+      const rawText = extractedTexts[i] || "";
       
       if (c.env.BUCKET) {
         await c.env.BUCKET.put(storagePath, await file.arrayBuffer(), {
@@ -245,6 +260,7 @@ app.post("/api/verify", async (c) => {
         name: file.name,
         category: "Uploaded",
         storagePath: storagePath,
+        rawText: rawText,
         status: "neutral" as const,
         logs: [{ type: "info", message: `File "${file.name}" received and stored in R2.`, details: `File ${i + 1} of ${uploadedFiles.length} queued.` }],
       });
@@ -256,6 +272,7 @@ app.post("/api/verify", async (c) => {
         name: "Commercial_Bank_Statement.pdf",
         category: "Financial",
         storagePath: null,
+        rawText: null,
         status: "success",
         logs: [
           { type: "success", message: "Bank Statement verification passed.", details: "3-year history analyzed. Closing balance: 9.2M LKR." },
@@ -265,6 +282,7 @@ app.post("/api/verify", async (c) => {
         name: isV2 ? "Birth_Certificate_V2.pdf" : "Birth_Certificate.pdf",
         category: "Identity",
         storagePath: null,
+        rawText: null,
         status: isV2 ? "success" : "error",
         logs: isV2
           ? [{ type: "success", message: "Name cross-check passed.", details: "Affidavit accepted." }]
@@ -274,6 +292,7 @@ app.post("/api/verify", async (c) => {
         name: isV2 ? "AL_Certificate_Stamped.pdf" : "AL_Certificate.pdf",
         category: "Educational",
         storagePath: null,
+        rawText: null,
         status: isV2 ? "success" : "error",
         logs: isV2
           ? [{ type: "success", message: "Foreign Ministry stamp detected." }]
@@ -286,8 +305,8 @@ app.post("/api/verify", async (c) => {
     for (const doc of mockDocuments) {
       const docId = uid();
       await db
-        .prepare("INSERT INTO documents (id, submission_id, applicant_id, name, category, document_type, extracted_data, storage_path, status, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind(docId, submissionId, applicantId, doc.name, doc.category, null, null, doc.storagePath, doc.status, actualVersion)
+        .prepare("INSERT INTO documents (id, submission_id, applicant_id, name, category, document_type, extracted_data, storage_path, raw_text, status, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(docId, submissionId, applicantId, doc.name, doc.category, null, null, doc.storagePath, doc.rawText, doc.status, actualVersion)
         .run();
 
       const savedLogs = [];
@@ -459,34 +478,30 @@ app.get("/api/dashboard/stats", async (c) => {
 
 // ── GET /api/files ────────────────────────────────────────────
 app.get("/api/files", async (c) => {
-  const env = c.env;
-  if (!env.BUCKET) return c.json({ error: "BUCKET binding not found" }, 500);
+  const db = c.env.DB;
+  if (!db) return c.json({ error: "DB binding not found" }, 500);
 
   try {
-    const list = await env.BUCKET.list();
-    
-    // Map R2 objects to FileRecord format expected by frontend
-    const files = list.objects.map(obj => {
-      const parts = obj.key.split("/");
-      const name = parts[parts.length - 1];
-      
-      // format: uploads/[applicantId]/[submissionId]/[filename]
-      const applicantId = parts.length > 2 ? parts[1] : "Unknown";
-      
-      return {
-        documentId: obj.key,
-        name: name,
-        category: "Storage",
-        storage_path: obj.key,
-        status: "success", // In R2 means successfully uploaded
-        applicantName: `ID: ${applicantId.substring(0, 8)}...`, // We show ID since we don't join with DB
-        date: obj.uploaded
-      };
-    });
+    const { results } = await db.prepare(`
+      SELECT 
+        d.storage_path as documentId,
+        d.name,
+        d.category,
+        d.storage_path,
+        d.status,
+        a.name as applicantName,
+        s.submitted_at as date,
+        d.raw_text
+      FROM documents d
+      JOIN submissions s ON d.submission_id = s.id
+      JOIN applicants a ON s.applicant_id = a.id
+      WHERE d.storage_path IS NOT NULL
+      ORDER BY s.submitted_at DESC
+    `).all();
 
-    return c.json(files);
+    return c.json(results);
   } catch (e: unknown) {
-    console.error("Failed to list files from R2:", e);
+    console.error("Failed to list files from DB:", e);
     return c.json({ error: String(e) }, 500);
   }
 });
