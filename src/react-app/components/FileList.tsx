@@ -28,7 +28,17 @@ export function FileList() {
     setError(null);
     try {
       const res = await fetch('/api/files');
-      if (!res.ok) throw new Error(`Failed to load: ${res.status}`);
+      if (!res.ok) {
+        const text = await res.text();
+        let errMsg = `Failed to load: ${res.status}`;
+        try {
+          const json = JSON.parse(text);
+          if (json.error) errMsg += ` - ${json.error}`;
+        } catch {
+          errMsg += ` - ${text}`;
+        }
+        throw new Error(errMsg);
+      }
       const data: FileRecord[] = await res.json();
       setFiles(data);
     } catch (e: unknown) {
