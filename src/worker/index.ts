@@ -494,23 +494,24 @@ app.get("/api/files", async (c) => {
 // ── GET /api/files/download ───────────────────────────────────
 app.get("/api/files/download", async (c) => {
   const env = c.env;
-  if (!env.BUCKET) return c.json({ error: "BUCKET binding not found" }, 500);
+  if (!env.BUCKET) return c.html(`<h1>BUCKET binding not found</h1>`, 200);
 
   const path = c.req.query("path");
-  if (!path) return c.json({ error: "Missing path parameter" }, 400);
+  if (!path) return c.html(`<h1>Missing path parameter</h1>`, 200);
 
   try {
     const object = await env.BUCKET.get(path);
-    if (!object) return c.json({ error: "File not found" }, 404);
+    if (!object) return c.html(`<h1>File not found in R2: ${path}</h1>`, 200);
 
     const headers = new Headers();
     object.writeHttpMetadata(headers);
     headers.set("etag", object.httpEtag);
+    headers.set("Content-Disposition", "inline");
     
     return new Response(object.body, { headers });
   } catch (e: unknown) {
     console.error("Failed to download file:", e);
-    return c.json({ error: String(e) }, 500);
+    return c.html(`<h1>Error downloading file: ${String(e)}</h1>`, 200);
   }
 });
 
