@@ -457,4 +457,56 @@ app.get("/api/dashboard/stats", async (c) => {
   }
 });
 
+// ── GET /api/files ────────────────────────────────────────────
+app.get("/api/files", async (c) => {
+  const db = c.env.DB;
+  if (!db) return c.json({ error: "DB binding not found" }, 500);
+
+  try {
+    const { results } = await db.prepare(`
+      SELECT 
+        d.id as documentId,
+        d.name,
+        d.category,
+        d.storage_path,
+        d.status,
+        a.name as applicantName,
+        s.submitted_at as date
+      FROM documents d
+      JOIN submissions s ON d.submission_id = s.id
+      JOIN applicants a ON s.applicant_id = a.id
+      WHERE d.storage_path IS NOT NULL
+      ORDER BY s.submitted_at DESC
+    `).all();
+
+    return c.json(results);
+  } catch (e: unknown) {
+    console.error("Failed to fetch files:", e);
+    return c.json({ error: String(e) }, 500);
+  }
+});
+
+// ── GET /api/files/download ───────────────────────────────────
+app.get("/api/files/download", async (c) => {
+  const env = c.env;
+  if (!env.BUCKET) return c.json({ error: "BUCKET binding not found" }, 500);
+
+  const path = c.req.query("path");
+  if (!path) return c.json({ error: "Missing path parameter" }, 400);
+
+  try {
+    const object = await env.BUCKET.get(path);
+    if (!object) return c.json({ error: "File not found" }, 404);
+
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set("etag", object.httpEtag);
+    
+    return new Response(object.body, { headers });
+  } catch (e: unknown) {
+    console.error("Failed to download file:", e);
+    return c.json({ error: String(e) }, 500);
+  }
+});
+
 export default app;
