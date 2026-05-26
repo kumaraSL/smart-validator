@@ -22,6 +22,10 @@ export function FileList() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<FileRecord | null>(null);
+  
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [isLoadingFile, setIsLoadingFile] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   const fetchFiles = useCallback(async () => {
     setIsLoading(true);
@@ -51,6 +55,42 @@ export function FileList() {
   useEffect(() => {
     fetchFiles();
   }, [fetchFiles]);
+
+  useEffect(() => {
+    if (selectedFile) {
+      setIsLoadingFile(true);
+      setFileError(null);
+      
+      const url = `/api/files/download?path=${encodeURIComponent(selectedFile.storage_path)}`;
+      fetch(url)
+        .then(async res => {
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || `Failed to load file: HTTP ${res.status}`);
+          }
+          const blob = await res.blob();
+          setFileUrl(URL.createObjectURL(blob));
+        })
+        .catch(e => {
+          setFileError(e instanceof Error ? e.message : 'Unknown error');
+        })
+        .finally(() => {
+          setIsLoadingFile(false);
+        });
+    } else {
+      if (fileUrl) {
+        URL.revokeObjectURL(fileUrl);
+        setFileUrl(null);
+      }
+    }
+    // Cleanup on unmount
+    return () => {
+      if (fileUrl) {
+        URL.revokeObjectURL(fileUrl);
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFile]);
 
   return (
     <>
@@ -257,12 +297,24 @@ export function FileList() {
               </div>
             </div>
             
-            <div style={{ flex: 1, background: '#f5f5f5' }}>
-              <iframe 
-                src={`/api/files/download?path=${encodeURIComponent(selectedFile.storage_path)}`}
-                style={{ width: '100%', height: '100%', border: 'none' }}
-                title={selectedFile.name}
-              />
+            <div style={{ flex: 1, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {isLoadingFile ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', color: 'var(--text-secondary)' }}>
+                  <Spinner size={32} />
+                  <span>Loading file content...</span>
+                </div>
+              ) : fileError ? (
+                <div style={{ color: 'var(--error)', padding: '24px', textAlign: 'center' }}>
+                  <h3>Failed to display file</h3>
+                  <p>{fileError}</p>
+                </div>
+              ) : fileUrl ? (
+                <iframe 
+                  src={fileUrl}
+                  style={{ width: '100%', height: '100%', border: 'none' }}
+                  title={selectedFile.name}
+                />
+              ) : null}
             </div>
           </div>
         </div>
