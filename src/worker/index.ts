@@ -71,6 +71,9 @@ app.use("/api/*", async (c, next) => {
         // Safe auto-migration for existing development databases
         await db.prepare("ALTER TABLE documents ADD COLUMN storage_path TEXT;").run().catch(() => {});
         await db.prepare("ALTER TABLE documents ADD COLUMN raw_text TEXT;").run().catch(() => {});
+        
+        // Backfill storage_path for documents that were uploaded before the column existed
+        await db.prepare("UPDATE documents SET storage_path = 'uploads/' || applicant_id || '/' || submission_id || '/' || name WHERE category = 'Uploaded' AND storage_path IS NULL;").run().catch(() => {});
       }
     } catch { /* ignore migration errors */ }
   }
@@ -484,10 +487,10 @@ app.get("/api/files", async (c) => {
   try {
     const { results } = await db.prepare(`
       SELECT 
-        d.storage_path as documentId,
+        COALESCE(d.storage_path, 'uploads/' || a.id || '/' || s.id || '/' || d.name) as documentId,
         d.name,
         d.category,
-        d.storage_path,
+        COALESCE(d.storage_path, 'uploads/' || a.id || '/' || s.id || '/' || d.name) as storage_path,
         d.status,
         a.name as applicantName,
         s.submitted_at as date,
@@ -495,7 +498,7 @@ app.get("/api/files", async (c) => {
       FROM documents d
       JOIN submissions s ON d.submission_id = s.id
       JOIN applicants a ON s.applicant_id = a.id
-      WHERE d.storage_path IS NOT NULL
+      WHERE d.storage_path IS NOT NULL OR d.category = 'Uploaded'
       ORDER BY s.submitted_at DESC
     `).all();
 
