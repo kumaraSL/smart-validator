@@ -59,38 +59,19 @@ export function FileList() {
 
   useEffect(() => {
     if (selectedFile) {
-      setIsLoadingFile(true);
+      // Use the provided R2 Public URL for direct iframe display
+      const r2PublicDomain = 'https://pub-dccc5b0050b14aa7970a126a31c160bf.r2.dev';
+      // Ensure the path doesn't have a leading slash if we append it
+      const path = selectedFile.storage_path.startsWith('/') 
+        ? selectedFile.storage_path.slice(1) 
+        : selectedFile.storage_path;
+        
+      setFileUrl(`${r2PublicDomain}/${path}`);
       setFileError(null);
-      
-      const url = `/api/files/download?path=${encodeURIComponent(selectedFile.storage_path)}`;
-      fetch(url)
-        .then(async res => {
-          if (!res.ok) {
-            const text = await res.text();
-            throw new Error(text || `Failed to load file: HTTP ${res.status}`);
-          }
-          const blob = await res.blob();
-          setFileUrl(URL.createObjectURL(blob));
-        })
-        .catch(e => {
-          setFileError(e instanceof Error ? e.message : 'Unknown error');
-        })
-        .finally(() => {
-          setIsLoadingFile(false);
-        });
+      setIsLoadingFile(false);
     } else {
-      if (fileUrl) {
-        URL.revokeObjectURL(fileUrl);
-        setFileUrl(null);
-      }
+      setFileUrl(null);
     }
-    // Cleanup on unmount
-    return () => {
-      if (fileUrl) {
-        URL.revokeObjectURL(fileUrl);
-      }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFile]);
 
   return (
@@ -274,8 +255,9 @@ export function FileList() {
               </div>
               <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
                 <a 
-                  href={`/api/files/download?path=${encodeURIComponent(selectedFile.storage_path)}`}
-                  download={selectedFile.name}
+                  href={fileUrl || '#'}
+                  target="_blank"
+                  rel="noreferrer"
                   className="btn-ghost"
                   style={{ textDecoration: 'none' }}
                 >
